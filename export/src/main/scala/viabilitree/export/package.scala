@@ -17,15 +17,14 @@
 
 package viabilitree
 
-import viabilitree.kdtree._
-import com.thoughtworks.xstream._
-import io.binary._
 import better.files._
-import cats._
-import cats.implicits._
+import com.thoughtworks.xstream._
+import com.thoughtworks.xstream.io.binary._
 import viabilitree.approximation.OracleApproximation
+import viabilitree.kdtree._
 
-import scala.util.Failure
+import scala.io.Source
+import scala.math.floor
 
 package object export extends better.files.Implicits {
 
@@ -52,6 +51,73 @@ package object export extends better.files.Implicits {
     finally source.close()
   }
 
+  var oriX =1.0
+  var oriY=1.0
+  var oppX=1.0
+  var oppY=1.0
+  var ppa=1.0
+  var X=1.0
+  var Y=1.0
+
+  def oracleFromFile(input: String)= (p: Vector[Double]) => { // A partir d'un fichier (au format vino) renvoit un oracle
+    val filename = input
+    val bufferedSource = Source.fromFile(filename)
+    var i = 0
+    var inOrOut = false
+
+
+    for (line <- bufferedSource.getLines()) {
+      if (i==0){ //origine
+        val ori = line.split(",")
+         oriX = ori(0).toFloat
+         oriY = ori(1).toFloat
+      }
+      if (i==1){ // opposite
+        val opp = line.split(",")
+         oppX = opp(0).toFloat
+         oppY = opp(1).toFloat
+      }
+      if (i==2){ //ppa
+         ppa = line.toFloat
+        val hiX = (oppX - oriX) / ppa // hi : taille d'un intervalle
+        val hiY = (oppY - oriY) / ppa
+        val p0 = p(0) - oriX
+        val p1 = p(1) - oriY //on leur enleve l'origine pour avoir la meme box
+        X = floor(p0 / hiX)
+        Y = floor(p1 / hiY)
+      }
+      if (i > 2) {
+        val bar = line.split(",")
+        if (bar(0).toInt == X && bar(1).toInt == Y) {
+
+          // println("in : "+bar(0)+","+bar(1))
+          inOrOut = true
+        }
+      }
+      i = i + 1
+    }
+    //println("out")
+    inOrOut
+  }
+
+
+  def boxFromFile (input: String) : Zone = {// A partir d'un fichier (au format vino) renvoit une box
+  val filename = input
+    val bufferedSource = Source.fromFile(filename)
+    val lines = bufferedSource.getLines.toList
+    bufferedSource.close
+    val x_ori = lines(0).split(",")
+    val x_opp = lines(1).split(",")
+    val x_oriX = x_ori(0).toDouble
+    val x_oriY =  x_ori(1).toDouble
+    val x_oppX = x_opp(0).toDouble
+    val x_oppY =  x_opp(1).toDouble
+    println("box: ("+x_oriX+","+x_oppX+");("+x_oriY+","+x_oppY+")")
+    Vector(
+      (x_oriX, x_oppX),
+      (x_oriY, x_oppY))
+
+  }
 
 //  def traceTraj(t:Seq[Point], file: File): Unit = {
 //    val output = Resource.fromFile(file)
