@@ -18,9 +18,9 @@ published by
 
 package viabilitree
 
-
 //import viabilitree.kdtree.structure.HelperFunctions.xor
 //import viabilitree.kdtree.structure.Path.{adjacency, adjacent}
+import simulacrum.typeclass
 import viabilitree.kdtree.HelperFunctions._
 import viabilitree.kdtree.SymbolicNode.SymbolicPath
 
@@ -28,6 +28,16 @@ import language.implicitConversions
 import scala.util.Random
 
 package object kdtree {
+
+  object ContainsLabel {
+    implicit def apply[CONTENT](f: CONTENT => Boolean): ContainsLabel[CONTENT] = new ContainsLabel[CONTENT] {
+      def label(t: CONTENT) = f(t)
+    }
+  }
+
+  trait ContainsLabel[T] {
+    def label(t: T): Boolean
+  }
 
   object Tree {
     import cats._
@@ -62,6 +72,7 @@ package object kdtree {
         case (t1: EmptyTree[T], _) => t1
         case (_, t2: EmptyTree[T]) => t2
       }
+
   }
 
   sealed trait Tree[T] {
@@ -90,11 +101,9 @@ package object kdtree {
     }
   }
 
-
   case class EmptyTree[T](zone: Zone) extends Tree[T] {
     def dimension = zone.dimension
   }
-
 
   import com.rits.cloning.Cloner
   import scala.reflect._
@@ -151,7 +160,6 @@ package object kdtree {
       NonEmptyTree[(T, U)](newRoot, t.depth)
     }
 
-
     def distanceInf[T](
       t: NonEmptyTree[T],
       label: T => Boolean,
@@ -167,7 +175,7 @@ package object kdtree {
               val c = Zone.center(boundaryLeave.zone)
               val p = projection(c, zone)
               (distance(c, p), boundaryLeave.path)
-            }.minBy { case(distance, _) => distance}
+            }.minBy { case (distance, _) => distance }
           distanceBound
       }
     }
@@ -181,7 +189,6 @@ package object kdtree {
       case class AddLeave(leaf: Leaf[T]) extends AddOperation
       case class AddSymbolicPath(symbolicPath: SymbolicPath, label: Boolean) extends AddOperation
 
-
       def intersectSimilarStructure(currentNodeT1: Node[T], currentNodeT2: Node[T]): List[AddOperation] = {
         (currentNodeT1, currentNodeT2) match {
           case (l1: Leaf[T], _) =>
@@ -191,11 +198,10 @@ package object kdtree {
             if (label(l2.content)) List(AddNode(currentNodeT1))
             else List(AddLeave(l2))
           case (n1: Fork[T], n2: Fork[T]) =>
-            if(n1.divisionCoordinate == n2.divisionCoordinate) intersectSimilarStructure(n1.lowChild, n2.lowChild) ++  intersectSimilarStructure(n1.highChild, n2.highChild)
+            if (n1.divisionCoordinate == n2.divisionCoordinate) intersectSimilarStructure(n1.lowChild, n2.lowChild) ++ intersectSimilarStructure(n1.highChild, n2.highChild)
             else intersectDivergentStructure(n1, n2)
         }
       }
-
 
       import SymbolicNode._
 
@@ -213,9 +219,9 @@ package object kdtree {
 
             (l1Specific.isEmpty, l2Specific.isEmpty) match {
               case (true, _) => if (label(l1.leaf.content)) Some(AddLeave(l2.leaf)) else Some(AddLeave(l1.leaf))
-              case (_, true) => if(label(l2.leaf.content)) Some(AddLeave(l1.leaf)) else Some(AddLeave(l2.leaf))
+              case (_, true) => if (label(l2.leaf.content)) Some(AddLeave(l1.leaf)) else Some(AddLeave(l2.leaf))
               case _ =>
-                if((l1Specific.keySet & l2Specific.keySet).isEmpty) Some(AddSymbolicPath(SymbolicPath.append(l1.path, l2Specific), label(l1.leaf.content) & label(l2.leaf.content)))
+                if ((l1Specific.keySet & l2Specific.keySet).isEmpty) Some(AddSymbolicPath(SymbolicPath.append(l1.path, l2Specific), label(l1.leaf.content) & label(l2.leaf.content)))
                 else None
             }
           }
@@ -224,33 +230,33 @@ package object kdtree {
       }
 
       //      def recurse(currentNodeT1: Node[T], currentNodeT2: Node[T], newParent: Option[Fork[T]] = None, level: Int = 0): Node[T] = {
-//        (currentNodeT1, currentNodeT2) match {
-//          case (l1: Leaf[T], _) =>
-//            if (label(l1.content)) {
-//              val n = Node.recusiveCopy(currentNodeT2)
-//              n.parent = newParent
-//              n
-//            } else Leaf.copy(l1)(parent = newParent)
-//          case (_, l2: Leaf[T]) =>
-//            if (label(l2.content)) {
-//              val n = Node.recusiveCopy(currentNodeT1)
-//              n.parent = newParent
-//              n
-//            } else Leaf.copy(l2)(parent = newParent)
-//          case (n1: Fork[T], n2: Fork[T]) =>
-//            if(n1.divisionCoordinate == n2.divisionCoordinate) {
-//              val f = Fork[T](zone = n1.zone, divisionCoordinate = n1.divisionCoordinate)
-//              val ln = recurse(n1.lowChild, n2.lowChild, Some(f), level = level + 1)
-//              val hn = recurse(n1.highChild, n2.highChild, Some(f), level = level + 1)
-//              f.parent = newParent
-//              f.attachLow(ln)
-//              f.attachHigh(hn)
-//              f
-//            } else {
-//              throw new RuntimeException("Tree containing nodes with different divisions coordinates are not supported yet.")
-//            }
-//        }
-//      }
+      //        (currentNodeT1, currentNodeT2) match {
+      //          case (l1: Leaf[T], _) =>
+      //            if (label(l1.content)) {
+      //              val n = Node.recusiveCopy(currentNodeT2)
+      //              n.parent = newParent
+      //              n
+      //            } else Leaf.copy(l1)(parent = newParent)
+      //          case (_, l2: Leaf[T]) =>
+      //            if (label(l2.content)) {
+      //              val n = Node.recusiveCopy(currentNodeT1)
+      //              n.parent = newParent
+      //              n
+      //            } else Leaf.copy(l2)(parent = newParent)
+      //          case (n1: Fork[T], n2: Fork[T]) =>
+      //            if(n1.divisionCoordinate == n2.divisionCoordinate) {
+      //              val f = Fork[T](zone = n1.zone, divisionCoordinate = n1.divisionCoordinate)
+      //              val ln = recurse(n1.lowChild, n2.lowChild, Some(f), level = level + 1)
+      //              val hn = recurse(n1.highChild, n2.highChild, Some(f), level = level + 1)
+      //              f.parent = newParent
+      //              f.attachLow(ln)
+      //              f.attachHigh(hn)
+      //              f
+      //            } else {
+      //              throw new RuntimeException("Tree containing nodes with different divisions coordinates are not supported yet.")
+      //            }
+      //        }
+      //      }
 
       // UGLY
       //NonEmptyTree(intersectSimilarStructure(t1.root, t2.root), math.max(t1.depth, t2.depth))
@@ -268,7 +274,6 @@ package object kdtree {
     def leaf(path: Path) = root.leaf(path)
   }
 
-
   type Path = List[PathElement]
   case class PathElement(coordinate: Int, descendant: Descendant)
 
@@ -276,9 +281,8 @@ package object kdtree {
   object Descendant {
     case object Low extends Descendant
     case object High extends Descendant
-    case object NotDescendant extends Descendant
+    //case object NotDescendant extends Descendant
   }
-
 
   def maximalReduction[T](criticalLeaves: Vector[Zone], testPoint: T => Vector[Double]): ContentReduction[T] = {
     def pointInCriticalLeaf(t: T) = criticalLeaves.exists(l => l.contains(testPoint(t)))
@@ -304,14 +308,13 @@ package object kdtree {
 
   implicit def intervalsToZone(intervals: Vector[(Double, Double)]) =
     Zone(
-      intervals.map { case (min, max) => Interval(min, max) }
-    )
+      intervals.map { case (min, max) => Interval(min, max) })
 
   case class Interval(min: Double, max: Double) {
     assume(min < max)
     def span: Double = max - min
     def normalizedSpan(referenceSpan: Double) = span / referenceSpan
- //   override def toString = min.toString + " " + max.toString
+    //   override def toString = min.toString + " " + max.toString
     // this line is useless
   }
   // TODO pour le test d'adjacence A virer sinon
@@ -346,7 +349,6 @@ package object kdtree {
 
   implicit def treeToNode[T](t: NonEmptyTree[T]) = t.root
 
-
   def leaves[T](n: Node[T]): Vector[Leaf[T]] =
     n match {
       case f: Fork[T] => leaves(f.lowChild) ++ leaves(f.highChild)
@@ -357,7 +359,7 @@ package object kdtree {
   //type Relabeliser[T] = (T, T => Boolean) => T
 
   // The critical pairs together with the coordinate of adjacency (no need to include the sign)
-  def pairsBetweenNodes[T](node1: Node[T], node2: Node[T], label: T => Boolean): Iterable[(Leaf[T], Leaf[T], Int)] = {
+  def criticalPairsBetweenNodes[T](node1: Node[T], node2: Node[T], label: T => Boolean): Iterable[(Leaf[T], Leaf[T], Int)] = {
     lazy val direction =
       Path.adjacency(node1.path, node2.path) match {
         case None => throw new RuntimeException("Zones must be adjacent.")
@@ -380,12 +382,11 @@ package object kdtree {
           (fork1.lowChild, fork2.lowChild),
           (fork1.lowChild, fork2.highChild),
           (fork1.highChild, fork2.lowChild),
-          (fork1.highChild, fork2.highChild)
-        ).flatMap {
-          case (n1, n2) =>
-            if (Path.adjacent(n1.path, n2.path)) pairsBetweenNodes(n1, n2, label)
-            else Nil
-        }
+          (fork1.highChild, fork2.highChild)).flatMap {
+            case (n1, n2) =>
+              if (Path.adjacent(n1.path, n2.path)) criticalPairsBetweenNodes(n1, n2, label)
+              else Nil
+          }
 
       case (fork: Fork[T], leaf: Leaf[T]) =>
         adjacentOppositeLeaves(leaf, fork, direction).map(borderLeaf => (leaf, borderLeaf, direction.coordinate))
@@ -422,7 +423,7 @@ package object kdtree {
     def zonesAndPathsToTest(leavesAndPrefCoord: Iterable[(Leaf[T], Int)], testPoint: T => Vector[Double]): List[(Zone, Path)] =
       leavesAndPrefCoord.toList.map {
         case (leaf, prefCoord) =>
-          assert(leaf.contains(testPoint(leaf.content)), "TestPoint: " + testPoint(leaf.content) + "  Leaf: " + leaf.zone.region.map(x => println(x.min + " " + x.max)))
+          assert(leaf.containingLeaf(testPoint(leaf.content)).isDefined, "TestPoint: " + testPoint(leaf.content) + "  Leaf: " + leaf.zone.region.map(x => println(x.min + " " + x.max)))
 
           val minCoord = Path.minimalCoordinates(leaf.path, leaf.zone.dimension)
 
@@ -438,10 +439,10 @@ package object kdtree {
 
   }
 
-
   implicit class TreeDecorator[T](t: Tree[T]) {
-    def volume(label: T => Boolean) = t match {
-      case t: NonEmptyTree[T] => new NonEmptyTreeDecorator(t).volume(label)
+
+    def volume(implicit withLabel: ContainsLabel[T]): Double = t match {
+      case t: NonEmptyTree[T] => new NonEmptyTreeDecorator(t).volume(withLabel.label)
       case EmptyTree(_) => 0.0
     }
 
@@ -475,15 +476,16 @@ package object kdtree {
       case e: EmptyTree[T] => e
     }
 
-    def contains(p: Vector[Double], label: T => Boolean): Boolean = t match {
-      case t: NonEmptyTree[T] => t.contains(p, label)
+    def contains(p: Vector[Double])(implicit withLabel: ContainsLabel[T]): Boolean = contains(withLabel.label(_), p)
+    def contains(label: T => Boolean, p: Vector[Double]): Boolean = t match {
+      case t: NonEmptyTree[T] => t.contains(label, p)
       case _: EmptyTree[_] => false
     }
   }
 
   implicit class NonEmptyTreeDecorator[T](t: NonEmptyTree[T]) {
 
-    def volume(label: T => Boolean) = t.root.volume(label)
+    def volume(implicit withLabel: ContainsLabel[T]): Double = t.root.volume(withLabel.label(_))
 
     def reassign(update: T => T)(implicit m: Manifest[T]) = {
       val newT = NonEmptyTree.clone(t)
@@ -511,8 +513,7 @@ package object kdtree {
             }
 
           val test = fork.borderLeaves(direction).filter(
-            x => (label(x.content) != label(leaf.content)) && Path.adjacent(leaf.path, x.path)
-          )
+            x => (label(x.content) != label(leaf.content)) && Path.adjacent(leaf.path, x.path))
 
           if (test.size != 0)
             test.flatMap {
@@ -548,58 +549,14 @@ package object kdtree {
       }
     }
 
-    def leavesToRefine(label: T => Boolean): Vector[(Leaf[T], Int)] = {
-
-      // The node together with the preferred coordinate (if another coordinate is bigger it will have no impact)
-      // Former node to refine
-      def leavesToRefine(n: Node[T], label: T => Boolean): Iterable[(Leaf[T], Int)] = {
-        val leaves =
-          (n match {
-            case leaf: Leaf[T] =>
-              label(leaf.content) match {
-                case true =>
-                  leaf.touchesBoundary match {
-                    case Some(coordinate) => List((leaf, coordinate))
-                    case None => List.empty
-                  }
-                case false => List.empty
-              }
-            case fork: Fork[T] =>
-              leavesToRefine(fork.lowChild, label) ++ leavesToRefine(fork.highChild, label) ++
-                pairsToSet(pairsBetweenNodes(fork.lowChild, fork.highChild, label))
-          }).filterNot {
-            case (leaf, _) => t.isAtomic(leaf)
-          }
-
-        //TODO: Consider the lines below
-        var distinctLeaves: List[(Leaf[T], Int)] = Nil
-        leaves.foreach(
-          x => {
-            if (distinctLeaves.forall(y => y._1 != x._1)) distinctLeaves = x :: distinctLeaves
-          }
-        )
-        distinctLeaves
-        /*  Source of non-deterministic behaviour (thanks Romain, 2 wasted journeys)
-        leaves.groupBy {
-          case (l, _) => l
-        }.toList.map {
-          case (_, l) => l.head
-        }
-        */
-      }
-
-      leavesToRefine(t.root, label).toVector
-
-    }
-
     // TODO Choose whether if p has not been found return false
-    def label(p: Vector[Double], label: T => Boolean) = contains(p, label)
-    def contains(p: Vector[Double], label: T => Boolean) =
+    def label(label: T => Boolean, p: Vector[Double]) = contains(label, p)
+    def contains(p: Vector[Double])(implicit withLabel: ContainsLabel[T]): Boolean = contains(withLabel.label(_), p)
+    def contains(label: T => Boolean, p: Vector[Double]) =
       t.zone.contains(p) match {
         case false => false
         case true => t.containingLeaf(p).map(l => label(l.content)).getOrElse(false)
       }
-
 
     // For TreeHandling : return atomic leaves that are extreme (i.e. on the root border)
     // Note : return only positive leaves
@@ -612,9 +569,9 @@ package object kdtree {
             case leaf: Leaf[T] =>
               label(leaf.content) match {
                 case true =>
-                  leaf.touchesBoundary match {
-                    case Some(coordinate) => List((leaf, coordinate))
-                    case None => List.empty
+                  leaf.touchesRootZoneBoundaries match {
+                    case List() => List.empty
+                    case coordinates => List((leaf, coordinates.head._1))
                   }
                 case false => List.empty
               }
@@ -629,8 +586,7 @@ package object kdtree {
         leaves.foreach(
           x => {
             if (distinctLeaves.forall(y => y._1 != x._1)) distinctLeaves = x :: distinctLeaves
-          }
-        )
+          })
         distinctLeaves
         /*  Source of non-deterministic behaviour (thanks Romain, 2 wasted journeys)
         leaves.groupBy {
@@ -643,7 +599,6 @@ package object kdtree {
 
       leavesOnRootZone(t.root, label)
     }
-
 
     def clean(content: T => Boolean, reduce: ContentReduction[T]): NonEmptyTree[T] =
       t.root match {
@@ -678,13 +633,14 @@ package object kdtree {
       def empty: SymbolicPath = Map.empty
 
       def diff(s1: SymbolicPath, s2: SymbolicPath) =
-        s1.map { case(d, v1) =>
-          def nv =
-            s2.get(d) match {
-              case None => v1
-              case Some(v2) => ((v1 zip v2) dropWhile { case(s1, s2) => s1 == s2 } unzip)._1
-            }
-          d -> nv
+        s1.map {
+          case (d, v1) =>
+            def nv =
+              s2.get(d) match {
+                case None => v1
+                case Some(v2) => ((v1 zip v2) dropWhile { case (s1, s2) => s1 == s2 } unzip)._1
+              }
+            d -> nv
         }
 
       def append(s1: SymbolicPath, s2: SymbolicPath) =
@@ -698,7 +654,7 @@ package object kdtree {
     def toSymbolicNode[T](n: Node[T], symbolicPath: SymbolicPath, levels: Option[Int] = None): List[SymbolicNode[T]] =
       (n, levels) match {
         case (n, Some(0)) => List(SymbolicNode[T](symbolicPath.mapValues(_.reverse), n))
-         case (l: Leaf[T], _) => List(SymbolicNode[T](symbolicPath.mapValues(_.reverse), l))
+        case (l: Leaf[T], _) => List(SymbolicNode[T](symbolicPath.mapValues(_.reverse), l))
         case (f: Fork[T], _) =>
           val pathOfCurrentCoordinate = symbolicPath.getOrElse(f.divisionCoordinate, List.empty)
           def lowPath: SymbolicPath = symbolicPath.updated(f.divisionCoordinate, Negative :: pathOfCurrentCoordinate)
@@ -715,7 +671,6 @@ package object kdtree {
           def highPath: SymbolicPath = symbolicPath.updated(f.divisionCoordinate, Positive :: pathOfCurrentCoordinate)
           toSymbolicLeaf(f.lowChild, lowPath) ++ toSymbolicLeaf(f.highChild, highPath)
       }
-
 
   }
 
@@ -745,14 +700,9 @@ package object kdtree {
     }
   }
 
-  import simulacrum._
-  @typeclass trait ContainsLabel[T] {
-    def label(t: T): Boolean
-  }
-
   type Distance = (Vector[Double], Vector[Double]) => Double
 
   def euclidianDistance: Distance =
-    (d1, d2) => (d1 zip d2).map { case(x1, x2) => math.abs(x2 - x1) }.sum
+    (d1, d2) => (d1 zip d2).map { case (x1, x2) => math.abs(x2 - x1) }.sum
 
 }

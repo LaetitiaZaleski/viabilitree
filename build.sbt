@@ -3,7 +3,7 @@ enablePlugins(ScalaJSPlugin)
 organization := "fr.iscpif"
 name := "viabilitree"
 
-scalaVersion in ThisBuild := "2.12.2"
+scalaVersion in ThisBuild := "2.12.4"
 
 publishTo in ThisBuild := isSnapshot { snapshot =>
   val nexus = "https://oss.sonatype.org/"
@@ -41,7 +41,7 @@ pomExtra in ThisBuild := {
 libraryDependencies in ThisBuild += "org.scalatest" %% "scalatest" % "3.0.1" % "test"
 libraryDependencies in ThisBuild += "org.scalacheck" %% "scalacheck" % "1.13.4" % "test"
 
-scalariformSettings
+scalariformSettings(autoformat = true)
 
 lazy val defaultSettings =
   Seq(
@@ -83,7 +83,13 @@ mainClass in Compile := Some("MonApp")
 
 //lazy val consumer = Project(id = "consumer", base = file("example/consumer")) settings(settings: _*) dependsOn(viability, export, model)
 
-//lazy val population = Project(id = "population", base = file("example/population")) settings(settings: _*) dependsOn(viability, export, model)
+lazy val population =
+  Project(id = "population", base = file("example/population")) settings(
+    publishArtifact := false,
+    OsgiKeys . exportPackage := Seq ( "viabilitree.*", "fr.iscpif.population.*"),
+    OsgiKeys . importPackage := Seq ( "*;resolution:=optional" ),
+    OsgiKeys . privatePackage := Seq ( "*" ),
+    OsgiKeys . requireCapability := """osgi.ee;filter:="(&(osgi.ee=JavaSE)(version=1.8))"""") dependsOn(viability, export, model) enablePlugins(SbtOsgi)
 
 lazy val lake = Project(id = "lake", base = file("example/lake")) settings(publishArtifact := false) dependsOn(viability, export, model, strategy)
 
@@ -103,7 +109,10 @@ lazy val monocle = Seq(
   "com.github.julien-truffaut"  %%  "monocle-macro"   % monocleVersion
 )
 
-lazy val cats = "org.typelevel" %% "cats" % "0.9.0"
+lazy val cats = "org.typelevel" %% "cats-core" % "1.0.1"
 
-lazy val simulacrum = "com.github.mpilquist" %% "simulacrum" % "0.10.0"
+lazy val simulacrum = "com.github.mpilquist" %% "simulacrum" % "0.11.0"
+
+
+
 

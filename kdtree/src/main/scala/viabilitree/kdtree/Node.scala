@@ -18,10 +18,10 @@ published by
 
 package viabilitree.kdtree
 
-import Path.extremeDivisions
+import Path.{ Touch, extremeDivisions }
 import viabilitree.kdtree.HelperFunctions._
-import util.Random
 
+import util.Random
 
 object Node {
 
@@ -31,7 +31,6 @@ object Node {
       case (l: Leaf[T]) => Leaf.copy[T](l)()
     }
 }
-
 
 sealed trait Node[T] { node =>
 
@@ -45,9 +44,9 @@ sealed trait Node[T] { node =>
     case None => List.empty
     case Some(parent) => {
       parent.descendantType(this) match {
-        case Descendant.Low => PathElement(parent.divisionCoordinate, Descendant.Low) :: parent.reversePath.toList
-        case Descendant.High => PathElement(parent.divisionCoordinate, Descendant.High) :: parent.reversePath.toList
-        case Descendant.NotDescendant =>
+        case Some(Descendant.Low) => PathElement(parent.divisionCoordinate, Descendant.Low) :: parent.reversePath.toList
+        case Some(Descendant.High) => PathElement(parent.divisionCoordinate, Descendant.High) :: parent.reversePath.toList
+        case None =>
           throw new RuntimeException("The node must be Low(child) or High(child) of its parent. (2)")
       }
     }
@@ -62,8 +61,6 @@ sealed trait Node[T] { node =>
     case Some(parent) => parent.rootCalling
   }
 
-  def contains(point: Vector[Double]) = containingLeaf(point).isDefined
-
   def containingLeaf(point: Vector[Double]): Option[Leaf[T]]
 
   def borderLeaves(direction: Direction): Iterable[Leaf[T]]
@@ -76,18 +73,18 @@ sealed trait Node[T] { node =>
   //Only needed for the unbounded version
   //TODO: Use this for refine function
   // It chooses the direction to expand a node (it will be a initialNode)
-//  def chooseDirection(preferredDirections: List[Direction], rng: Random): Direction = {
-//    val spanList: List[(Double, Int)] = zone.region.map(i => i.max - i.min).toList.zipWithIndex
-//    val smallestSpans: List[(Double, Int)] = spanList.filter(k => spanList.forall(i => k._1 <= i._1))
-//    val smallestCoordinates: List[Int] = smallestSpans.map(x => x._2)
-//    val selectedDirections = preferredDirections.filter(k => smallestCoordinates.exists(i => i == k.coordinate))
-//    if (selectedDirections != Nil) randomElement(selectedDirections, rng)
-//    else {
-//      val direction = randomElement(smallestCoordinates, rng)
-//      val sign = if (rng.nextBoolean()) Positive else Negative
-//      new Direction(direction, sign)
-//    }
-//  }
+  //  def chooseDirection(preferredDirections: List[Direction], rng: Random): Direction = {
+  //    val spanList: List[(Double, Int)] = zone.region.map(i => i.max - i.min).toList.zipWithIndex
+  //    val smallestSpans: List[(Double, Int)] = spanList.filter(k => spanList.forall(i => k._1 <= i._1))
+  //    val smallestCoordinates: List[Int] = smallestSpans.map(x => x._2)
+  //    val selectedDirections = preferredDirections.filter(k => smallestCoordinates.exists(i => i == k.coordinate))
+  //    if (selectedDirections != Nil) randomElement(selectedDirections, rng)
+  //    else {
+  //      val direction = randomElement(smallestCoordinates, rng)
+  //      val sign = if (rng.nextBoolean()) Positive else Negative
+  //      new Direction(direction, sign)
+  //    }
+  //  }
 
   ///////// REFINING METHODS
 
@@ -115,7 +112,7 @@ sealed trait Node[T] { node =>
 
 object Fork {
 
-  private [kdtree] def zipContent[T, U](ft: Fork[T], fu: Fork[U]): Fork[(T, U)] = {
+  private[kdtree] def zipContent[T, U](ft: Fork[T], fu: Fork[U]): Fork[(T, U)] = {
     assert(ft.divisionCoordinate == fu.divisionCoordinate, "Trees should have a similar structure to be zipped")
     (ft.lowChild, fu.lowChild, ft.highChild, fu.highChild) match {
       case (ltl: Leaf[T], lul: Leaf[U], lth: Leaf[T], luh: Leaf[U]) =>
@@ -138,7 +135,7 @@ object Fork {
     }
   }
 
-  private [kdtree] def map[T, U](fork: Fork[T])(f: T => U): Fork[U] =
+  private[kdtree] def map[T, U](fork: Fork[T])(f: T => U): Fork[U] =
     (fork.lowChild, fork.highChild) match {
       case (ll: Leaf[T], lh: Leaf[T]) =>
         val llu = Leaf.map(ll)(f)
@@ -158,7 +155,7 @@ object Fork {
         Fork[U](fork.divisionCoordinate, fork.zone, flu, lhu)
     }
 
-  private [kdtree] def zipWithLeaf[T, U](fork: Fork[T])(f: Leaf[T] => U): Fork[(T, U)] =
+  private[kdtree] def zipWithLeaf[T, U](fork: Fork[T])(f: Leaf[T] => U): Fork[(T, U)] =
     (fork.lowChild, fork.highChild) match {
       case (ll: Leaf[T], lh: Leaf[T]) =>
         val llu = Leaf.zipWithLeaf(ll)(f)
@@ -178,8 +175,7 @@ object Fork {
         Fork(fork.divisionCoordinate, fork.zone, flu, lhu)
     }
 
-
-  private [kdtree] def clean[CONTENT](f: Fork[CONTENT], label: CONTENT => Boolean, reduce: ContentReduction[CONTENT]): Node[CONTENT] = {
+  private[kdtree] def clean[CONTENT](f: Fork[CONTENT], label: CONTENT => Boolean, reduce: ContentReduction[CONTENT]): Node[CONTENT] = {
     def mergeLeafs(ll: Leaf[CONTENT], lh: Leaf[CONTENT]): Node[CONTENT] =
       reduce(ll, lh) match {
         case Some(reduced) => Leaf(reduced, f.zone)
@@ -196,9 +192,9 @@ object Fork {
 
     (f.lowChild, f.highChild) match {
       case (ll: Leaf[CONTENT], lh: Leaf[CONTENT]) => if (label(ll.content) == label(lh.content)) mergeLeafs(ll, lh) else copy(f)(lowChild = ll, highChild = lh)
-      case (fl: Fork[CONTENT], fh: Fork[CONTENT]) => mergeNodes(clean(fl, label, reduce), clean (fh, label, reduce))
-      case (ll: Leaf[CONTENT], fh: Fork[CONTENT]) => mergeNodes(ll, clean (fh, label, reduce))
-      case (fl: Fork[CONTENT], lh: Leaf[CONTENT]) => mergeNodes(clean (fl, label, reduce), lh)
+      case (fl: Fork[CONTENT], fh: Fork[CONTENT]) => mergeNodes(clean(fl, label, reduce), clean(fh, label, reduce))
+      case (ll: Leaf[CONTENT], fh: Fork[CONTENT]) => mergeNodes(ll, clean(fh, label, reduce))
+      case (fl: Fork[CONTENT], lh: Leaf[CONTENT]) => mergeNodes(clean(fl, label, reduce), lh)
     }
   }
 
@@ -208,8 +204,7 @@ object Fork {
       zone = f.zone,
       lowChild = lowChild,
       highChild = highChild,
-      parent = f.parent
-    )
+      parent = f.parent)
 
   def recursiveCopy[T](f: Fork[T]): Fork[T] = map(f)(identity[T])
 
@@ -239,35 +234,34 @@ object Fork {
 
 }
 
-
 trait Fork[T] extends Node[T] { fork =>
 
   val divisionCoordinate: Int
 
   protected var _lowChild: Node[T] = null
-  protected var _highChild: Node[T]  = null
+  protected var _highChild: Node[T] = null
 
   def reassignChild(from: Node[T], to: Node[T]) =
     descendantType(from) match {
-      case Descendant.Low => attachLow(to)
-      case Descendant.High => attachHigh(to)
-      case Descendant.NotDescendant => throw new RuntimeException("The original leaf should be lowChild or highChild")
+      case Some(Descendant.Low) => attachLow(to)
+      case Some(Descendant.High) => attachHigh(to)
+      case None => throw new RuntimeException("The original leaf should be lowChild or highChild")
     }
 
-  def descendantType(child: Node[_]): Descendant = {
-    if (_lowChild == child) Descendant.Low
-    else if (highChild == child) Descendant.High
-    else Descendant.NotDescendant
+  def descendantType(child: Node[_]): Option[Descendant] = {
+    if (_lowChild == child) Some(Descendant.Low)
+    else if (highChild == child) Some(Descendant.High)
+    else None
   }
 
   def attachLow(child: Node[T]) {
     _lowChild = child
-    if(child != null) child.parent = Some(this)
+    if (child != null) child.parent = Some(this)
   }
 
   def attachHigh(child: Node[T]) {
     _highChild = child
-    if(child != null) child.parent = Some(this)
+    if (child != null) child.parent = Some(this)
   }
 
   def containingLeaf(point: Vector[Double]): Option[Leaf[T]] =
@@ -342,8 +336,6 @@ trait Fork[T] extends Node[T] { fork =>
 
 }
 
-
-
 object Leaf {
 
   def apply[T](content: T, zone: Zone, parent: Option[Fork[T]] = None) = {
@@ -370,13 +362,13 @@ object Leaf {
   def copy[T](leaf: Leaf[T])(content: T = leaf.content, zone: Zone = leaf.zone, parent: Option[Fork[T]] = None): Leaf[T] =
     apply(content, zone, parent)
 
-  private [kdtree] def map[T, U](leaf: Leaf[T])(f: T => U) =
+  private[kdtree] def map[T, U](leaf: Leaf[T])(f: T => U) =
     apply[U](f(leaf.content), leaf.zone)
 
-  private [kdtree] def zipWithLeaf[T, U](leaf: Leaf[T])(f: Leaf[T] => U) =
+  private[kdtree] def zipWithLeaf[T, U](leaf: Leaf[T])(f: Leaf[T] => U) =
     apply[(T, U)]((leaf.content, f(leaf)), leaf.zone)
 
-  private [kdtree] def zipContent[T, U](lt: Leaf[T], lu: Leaf[U]): Leaf[(T, U)] =
+  private[kdtree] def zipContent[T, U](lt: Leaf[T], lu: Leaf[U]): Leaf[(T, U)] =
     Leaf((lt.content, lu.content), lt.zone)
 
 }
@@ -388,11 +380,16 @@ trait Leaf[T] extends Node[T] { self =>
 
   // This function is specific to the bounded case. The output
   // is an Option[Int] that gives the coordinate corresponding to the direction
-  def touchesBoundary: Option[Int] = {
+  def touchesRootZoneBoundaries: List[(Int, Touch)] = {
     val path = reversePath
     val range: Range = zone.region.indices
-    val coordinate = range.find(coordinate => extremeDivisions(path, coordinate))
-    coordinate
+    val coordinate =
+      range.flatMap {
+        coordinate => extremeDivisions(path, coordinate).map { t => coordinate -> t }
+        //coordinate -> extremeDivisions(path, coordinate)
+      }
+
+    coordinate.toList
   }
 
   def borderLeaves(direction: Direction): Iterable[Leaf[T]] = Vector(this)
@@ -420,8 +417,7 @@ trait Leaf[T] extends Node[T] { self =>
     val newFork = Fork[T](
       divisionCoordinate = extendedPath.last.coordinate,
       zone = self.zone,
-      parent = this.parent
-    )
+      parent = this.parent)
 
     newFork.parent match {
       case None =>

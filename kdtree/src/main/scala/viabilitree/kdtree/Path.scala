@@ -18,7 +18,6 @@ published by
 
 package viabilitree.kdtree
 
-
 object Path {
 
   /////// FUNCTIONS TO COMPUTE ADJACENCY
@@ -40,7 +39,6 @@ object Path {
         case Descendant.High =>
           val direction = new AdjacencyDirection(reducedX(0).coordinate, LeftIsHigh)
           Some(direction)
-        case Descendant.NotDescendant => throw new RuntimeException("Error: [Descendant.NotDescendant] should not happen.")
       }
       else None
     }
@@ -107,8 +105,24 @@ object Path {
 
   ////////////
 
+  object Touch {
+    def apply(descendant: Descendant) =
+      descendant match {
+        case Descendant.Low => Low
+        case Descendant.High => High
+      }
+
+    case object Low extends Touch
+    case object High extends Touch
+    case object Both extends Touch
+
+    implicit def fromDescendant(descendant: Descendant) = Touch(descendant)
+  }
+
+  sealed trait Touch
+
   // Check if divisions are always Low or always High
-  def extremeDivisions(path: Path, coordinate: Int): Boolean = {
+  def extremeDivisions(path: Path, coordinate: Int): Option[Touch] = {
     val filteredPath = path.filter(x => x.coordinate == coordinate)
     val sideDivisions: List[Descendant] = filteredPath.map(x => x.descendant).toList
 
@@ -121,9 +135,13 @@ object Path {
         }
       }
     }
-    aux(sideDivisions)
-  }
 
+    aux(sideDivisions) match {
+      case true if sideDivisions.isEmpty => Some(Touch.Both)
+      case true => Some(Touch(sideDivisions.head))
+      case false => None
+    }
+  }
 
   def minimalCoordinates(path: Path, dimensions: Int) = {
     val coordCardinals = path.groupBy(_.coordinate).mapValues { _.size }

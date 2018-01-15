@@ -26,13 +26,24 @@ import scala.util.Random
 
 object KdTreeComputation {
 
-//  def dilate[CONTENT](t: NonEmptyTree[CONTENT], n: Int, evaluator: Evaluator[CONTENT], label: Lens[CONTENT, Boolean], testPoint: CONTENT => Point)(implicit rng: Random): NonEmptyTree[CONTENT] =
-//    if(n <= 0) t
-//    else dilate(dilate(t, evaluator, label, testPoint), n - 1, evaluator, label, testPoint)
+  //  def dilate[CONTENT](t: NonEmptyTree[CONTENT], n: Int, evaluator: Evaluator[CONTENT], label: Lens[CONTENT, Boolean], testPoint: CONTENT => Point)(implicit rng: Random): NonEmptyTree[CONTENT] =
+  //    if(n <= 0) t
+  //    else dilate(dilate(t, evaluator, label, testPoint), n - 1, evaluator, label, testPoint)
+
+  def dilate[CONTENT: ClassTag](evaluator: Evaluator[CONTENT], label: Lens[CONTENT, Boolean], testPoint: CONTENT => Vector[Double], neutralBoundary: NeutralBoundary, t: Tree[CONTENT], rng: Random): Tree[CONTENT] =
+    t match {
+      case t: NonEmptyTree[CONTENT] => dilate[CONTENT](evaluator, label, testPoint, neutralBoundary)(t, rng)
+      case t: EmptyTree[CONTENT] => t
+    }
 
   // TODO might beneficiate from a mutable version of learnBoundary
+<<<<<<< HEAD
   def dilate[CONTENT: ClassTag](evaluator: Evaluator[CONTENT], label: Lens[CONTENT, Boolean], testPoint: CONTENT => Vector[Double])(t: NonEmptyTree[CONTENT], rng: Random): NonEmptyTree[CONTENT] = {
     val newT = kdtree.NonEmptyTree.clone(t)
+=======
+  def dilate[CONTENT: ClassTag](evaluator: Evaluator[CONTENT], label: Lens[CONTENT, Boolean], testPoint: CONTENT => Vector[Double], neutralBoundary: NeutralBoundary)(t: NonEmptyTree[CONTENT], rng: Random): NonEmptyTree[CONTENT] = {
+    val newT = NonEmptyTree.clone(t)
+>>>>>>> ISCPIF/master
     val leaves = newT.criticalLeaves(label.get, newT.root).filter(l => label.get(l.content) == false).toSeq.distinct
     var currentRoot = newT.root
     leaves.foreach {
@@ -41,7 +52,7 @@ object KdTreeComputation {
     }
     //Tree(currentRoot, newT.depth)
     val dilated = NonEmptyTree(currentRoot, newT.depth)
-    learnBoundary(label.get, testPoint).apply(dilated, evaluator, rng) //buildContent(_, false))
+    learnBoundary(label.get, testPoint, neutralBoundary).apply(dilated, evaluator, rng) //buildContent(_, false))
   }
 
   def findTrueLabel[CONTENT: ClassTag](evaluator: Evaluator[CONTENT], label: CONTENT => Boolean, testPoint: CONTENT => Vector[Double]): FindTrueLabel[CONTENT] = { (t, rng) =>
@@ -50,13 +61,12 @@ object KdTreeComputation {
     else {
       val newT = NonEmptyTree.clone(t)
 
-
       // TODO refine is sequential maybe costly if kernel is empty, refine all bigest leaves in parallel?
       // TODO heuristic guess of control?
       def refineNonAtomicLeaves(l: List[Leaf[CONTENT]], tree: NonEmptyTree[CONTENT]): Tree[CONTENT] = {
         l match {
           case Nil => EmptyTree(t.zone)
-          case l@(h1 :: _) =>
+          case l @ (h1 :: _) =>
 
             def divide(toDivide: List[Leaf[CONTENT]], nextDivision: List[Leaf[CONTENT]], tree: NonEmptyTree[CONTENT]): (List[Leaf[CONTENT]], NonEmptyTree[CONTENT], Boolean) =
               toDivide match {
@@ -97,32 +107,27 @@ object KdTreeComputation {
     }
   }
 
-
-  def learnBoundary[CONTENT: ClassTag](label: CONTENT => Boolean, testPoint: CONTENT => Vector[Double]): LearnBoundary[CONTENT] =
+  def learnBoundary[CONTENT: ClassTag](label: CONTENT => Boolean, testPoint: CONTENT => Vector[Double], neutralBoundary: NeutralBoundary): LearnBoundary[CONTENT] =
     (tree: NonEmptyTree[CONTENT], evaluator: Evaluator[CONTENT], rng: Random) => {
       //  def learnBoundary(tree: Tree[CONTENT], evaluator: Evaluator[CONTENT] /*contentBuilder: Point => CONTENT*/)(implicit rng: Random): Tree[CONTENT] = {
       def refine(tree: NonEmptyTree[CONTENT]): NonEmptyTree[CONTENT] = {
         import mutable._
-        val leavesToRefine = tree.leavesToRefine(label)
+        val leavesToRefineValue = leavesToRefine(tree, label, neutralBoundary)
 
-        if (leavesToRefine.isEmpty) tree
+        if (leavesToRefineValue.isEmpty) tree
         else
           refine(
             tree.evaluateAndInsert(
-              tree.root.zonesAndPathsToTest(leavesToRefine, testPoint).toVector,
-              evaluator
-            )(rng)
-          )
+              tree.root.zonesAndPathsToTest(leavesToRefineValue, testPoint).toVector,
+              evaluator)(rng))
       }
       refine(NonEmptyTree.clone(tree))
     }
-
 
   def erode[CONTENT](erosion: Erosion[CONTENT])(t: Tree[CONTENT], n: Int, rng: Random): Tree[CONTENT] = {
     if (n <= 0) t
     else erode(erosion)(erosion(t, rng), n - 1, rng)
   }
-
 
   type LeafSelection[CONTENT] = Tree[CONTENT] => Vector[Leaf[CONTENT]]
 
@@ -133,7 +138,7 @@ object KdTreeComputation {
     (t: Tree[CONTENT]) => {
       def computeOnBorder(t: Tree[CONTENT]): Vector[Leaf[CONTENT]] =
         t.leavesOnRootZone(label).toVector.filter {
-          case(leaf,i) => leafIsOnBorder(borderZone, leaf, i)
+          case (leaf, i) => leafIsOnBorder(borderZone, leaf, i)
         }.map { _._1 }
 
       def leafIsOnBorder[CONTENT](zone: Zone, leaf: Leaf[CONTENT], axis: Int): Boolean = {
@@ -147,8 +152,6 @@ object KdTreeComputation {
 
       computeOnBorder(t)
     }
-
-
 
   def onBorderOfBlackBoxDomain[CONTENT](domain: Oracle)(leaf: Leaf[CONTENT]) = {
     // FIXME make it tailrec and lazy
@@ -168,23 +171,22 @@ object KdTreeComputation {
     corners(leaf.zone).exists { p => domain(p.toVector) == false }
   }
 
-//  def onBorderOfZoneDomain[CONTENT](domain: Zone)(leaf: Leaf[CONTENT]) = {
-//    // There may be an optimisation if leave touches border of definition zone
-//
-//    // TODO find a lib for floating point comparison
-//  }
+  //  def onBorderOfZoneDomain[CONTENT](domain: Zone)(leaf: Leaf[CONTENT]) = {
+  //    // There may be an optimisation if leave touches border of definition zone
+  //
+  //    // TODO find a lib for floating point comparison
+  //  }
 
-
-  def leavesToErode[CONTENT](domain: Domain, zone: Zone, label: CONTENT => Boolean): LeafSelection[CONTENT] =  (t: Tree[CONTENT]) =>
+  def leavesToErode[CONTENT](domain: Domain, zone: Zone, label: CONTENT => Boolean): LeafSelection[CONTENT] = (t: Tree[CONTENT]) =>
     domain match {
       case BlackBoxDomain(domain) =>
-        (KdTreeComputation.innerCriticalLeaves(label)(t) ++ leavesOnBorderOfZone (zone, label) (t).
-          filter { l => t.isAtomic(l) }).filter { l => !onBorderOfBlackBoxDomain(domain)(l) }
+        (KdTreeComputation.innerCriticalLeaves(label)(t) ++ leavesOnBorderOfZone(zone, label)(t).
+          filter { l => t.isAtomic(l) }).
+          filter { l => !onBorderOfBlackBoxDomain(domain)(l) }
       case InfiniteDomain =>
-         KdTreeComputation.innerCriticalLeaves(label)(t) ++ leavesOnBorderOfZone (zone, label) (t).filter { l => t.isAtomic(l) }
+        KdTreeComputation.innerCriticalLeaves(label)(t) ++ leavesOnBorderOfZone(zone, label)(t).filter { l => t.isAtomic(l) }
       //case ZoneDomain(domain) => ???
     }
-
 
   def erosion[CONTENT: ClassTag](
     learnBoundary: LearnBoundary[CONTENT],
@@ -209,31 +211,31 @@ object KdTreeComputation {
       }
     }
 
-//
-//  def erosionInDomain[CONTENT](
-//    learnBoundary: LearnBoundary[CONTENT],
-//    evaluator: Evaluator[CONTENT],
-//    label: Lens[CONTENT, Boolean],
-//    domain: Zone): Erosion[CONTENT] = (t: Tree[CONTENT], additionalLeaves: Vector[Leaf[CONTENT]], rng: Random) => {
-//
-//      def computeOnBorderWithDomain(t: Tree[CONTENT]): Iterable[Leaf[CONTENT]]=
-//        t.leavesOnRootZone(label.get).filter {
-//          case(leaf,i) => borderOnDomain(leaf,i)
-//        }.map { _._1 }
-//
-//      /* Warning leaf is supposed to be atomic */
-//      def borderOnDomain(leaf: Leaf[CONTENT], i: Int): Boolean = {
-//        val aux = (leaf.zone.region(i).max - leaf.zone.region(i).min) / 2
-//        val a = leaf.zone.region(i).min
-//        val minDomain = domain.region(i).min
-//        val b = leaf.zone.region(i).max
-//        val maxDomain = domain.region(i).max
-//        (a > minDomain + aux)&& (b < maxDomain - aux)
-//      }
-//
-//      val leavesOnBorderWithDomain = computeOnBorderWithDomain(t)
-//      erosion(learnBoundary, evaluator, label)(t, additionalLeaves ++ leavesOnBorderWithDomain, rng)
-//    }
+  //
+  //  def erosionInDomain[CONTENT](
+  //    learnBoundary: LearnBoundary[CONTENT],
+  //    evaluator: Evaluator[CONTENT],
+  //    label: Lens[CONTENT, Boolean],
+  //    domain: Zone): Erosion[CONTENT] = (t: Tree[CONTENT], additionalLeaves: Vector[Leaf[CONTENT]], rng: Random) => {
+  //
+  //      def computeOnBorderWithDomain(t: Tree[CONTENT]): Iterable[Leaf[CONTENT]]=
+  //        t.leavesOnRootZone(label.get).filter {
+  //          case(leaf,i) => borderOnDomain(leaf,i)
+  //        }.map { _._1 }
+  //
+  //      /* Warning leaf is supposed to be atomic */
+  //      def borderOnDomain(leaf: Leaf[CONTENT], i: Int): Boolean = {
+  //        val aux = (leaf.zone.region(i).max - leaf.zone.region(i).min) / 2
+  //        val a = leaf.zone.region(i).min
+  //        val minDomain = domain.region(i).min
+  //        val b = leaf.zone.region(i).max
+  //        val maxDomain = domain.region(i).max
+  //        (a > minDomain + aux)&& (b < maxDomain - aux)
+  //      }
+  //
+  //      val leavesOnBorderWithDomain = computeOnBorderWithDomain(t)
+  //      erosion(learnBoundary, evaluator, label)(t, additionalLeaves ++ leavesOnBorderWithDomain, rng)
+  //    }
 
 }
 //
