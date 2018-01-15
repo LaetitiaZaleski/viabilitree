@@ -5,15 +5,15 @@ import viabilitree.model._
 case class Parc2D_B(
                      integrationStep: Double = 0.0001,
                      timeStep: Double = 0.001,
-                     g: Double = 1.0,
+                     g: Double = 2.0, // 1.0
                      M: Double = 5000.0,
                      a: Double = 100.0,
                      c: Double = 0.01,
                      eta: Double = 0.001,
                      d: Double = 1.0,
                      phi: Double =1.0,
-                     p: Double =0.3,
-                     l: Double = 0.01
+                     p: Double =0.3,  // 0.3
+                     l: Double = 0.02 //0.01
                      // valeurs de controle: eps control(1) et zeta control(0)
                    ) {
 

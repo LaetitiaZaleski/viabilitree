@@ -1,3 +1,4 @@
+enablePlugins(ScalaJSPlugin)
 
 organization := "fr.iscpif"
 name := "viabilitree"
@@ -70,6 +71,9 @@ lazy val model = Project(id = "model", base = file("model"))  settings(defaultSe
   libraryDependencies += "org.apache.commons" % "commons-math3" % "3.6.1")
 
 lazy val strategy = Project(id = "strategy", base = file("strategy")) settings(defaultSettings: _*) dependsOn(viability, kdtree)
+
+lazy val web = Project(id = "web", base = file("web")) settings(defaultSettings: _*) dependsOn(viability, kdtree, approximation, model)
+mainClass in Compile := Some("MonApp")
 
 /*----- Exemples -----*/
 

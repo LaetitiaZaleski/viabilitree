@@ -18,6 +18,7 @@
 package viabilitree.approximation
 
 import monocle._
+import viabilitree.kdtree
 import viabilitree.kdtree._
 
 import scala.reflect.ClassTag
@@ -31,7 +32,7 @@ object KdTreeComputation {
 
   // TODO might beneficiate from a mutable version of learnBoundary
   def dilate[CONTENT: ClassTag](evaluator: Evaluator[CONTENT], label: Lens[CONTENT, Boolean], testPoint: CONTENT => Vector[Double])(t: NonEmptyTree[CONTENT], rng: Random): NonEmptyTree[CONTENT] = {
-    val newT = NonEmptyTree.clone(t)
+    val newT = kdtree.NonEmptyTree.clone(t)
     val leaves = newT.criticalLeaves(label.get, newT.root).filter(l => label.get(l.content) == false).toSeq.distinct
     var currentRoot = newT.root
     leaves.foreach {

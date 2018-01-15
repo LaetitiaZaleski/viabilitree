@@ -8,18 +8,18 @@ object Parc2DViabilityKernel extends App {
 
   val parc = Parc2D_B()
   val rng = new util.Random(42)
-  var vinoFile = "/Users/laetitiazaleski/Documents/GitHub/vino/vinosite/media/statesets/2017/07/27/Point7_10"
+  var vinoFile = "/Users/laetitiazaleski/Documents/GitHub/vino/vinosite/media/statesets/2017/08/24/New_Points1"
 
 
   val vk = KernelComputation(
     dynamic = parc.dynamic,
-    depth = 16,
+    depth = 20,
     zone = boxFromFile(vinoFile),
     domain = oracleFromFile(vinoFile),
     // controls = Vector((0.02 to 0.4 by 0.02 ))
     controls = (x: Vector[Double]) =>
       for {
-        c1 <- (0.02 to 0.04 by 0.02 )
+        c1 <- (0.02 to 0.03 by 0.01 )
         c2 <- (0.0 to 10.0 by 10.0)
       } yield Control(c1, c2)
 
@@ -30,8 +30,8 @@ object Parc2DViabilityKernel extends App {
   println(steps)
 
 
-  saveVTK2D(ak, s"/Users/laetitiazaleski/Desktop/results/resparc2_2DDepth${vk.depth}2controls_Triangle.vtk")
-  saveHyperRectangles(vk)(ak,s"/Users/laetitiazaleski/Desktop/results/resparc2DBWithControlD${vk.depth}_Triangle.txt")
+  saveVTK2D(ak, s"/Users/laetitiazaleski/Desktop/results/resparc2_2DDepth${vk.depth}2controls_PasBcpCompromis_p03g2l002.vtk")
+  saveHyperRectangles(vk)(ak,s"/Users/laetitiazaleski/Desktop/results/resparc2DBWithControlD${vk.depth}_PasBcpCompromis_p03g2l002.txt")
   // saveHyperRectangles(vk)(ak,s"/tmp/resparcWithControlD${vk.depth}.txt")
 
   //println(volume(res))
